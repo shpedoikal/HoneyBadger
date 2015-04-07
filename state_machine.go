@@ -100,6 +100,7 @@ type Connection struct {
 	packetCount      uint64
 	lastSeen         time.Time
 	lastSeenMutex    sync.Mutex
+	closeMutex       sync.Mutex
 	state            uint8
 	clientState      uint8
 	serverState      uint8
@@ -163,11 +164,28 @@ func (c *Connection) updateLastSeen(timestamp time.Time) {
 	}
 }
 
+func (c *Connection) IsClosed() bool {
+	c.closeMutex.Lock()
+	defer c.closeMutex.Unlock()
+	if c.state == TCP_CLOSED {
+		return true
+	} else {
+		return false
+	}
+}
+
 // Close is used by the Connection to shutdown itself.
 // Firstly it removes it's entry from the connection pool...
 // if CloseRequestChanListening is set to true.
 // After that Stop is called.
 func (c *Connection) Close() {
+	c.closeMutex.Lock()
+	defer c.closeMutex.Unlock()
+
+	if c.state == TCP_CLOSED {
+		return
+	}
+
 	c.state = TCP_CLOSED
 
 	// remove this connection from the pool so that
@@ -177,7 +195,7 @@ func (c *Connection) Close() {
 	// sloppy ensurance that if the next sniffed packet is destined for this connection
 	// then we'll sleep through it before closing the receiveChan.
 	go func() { // sloppy way to mitigate race with packet sniffer
-		time.Sleep(40 * time.Second)
+		time.Sleep(77 * time.Second)
 		close(c.receiveChan)
 	}()
 
