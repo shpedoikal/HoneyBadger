@@ -83,7 +83,7 @@ func NewInquisitor(options *InquisitorOptions) *Inquisitor {
 		stopDecodeChan:      make(chan bool),
 		dispatchPacketChan:  make(chan HoneyBadger.PacketManifest),
 		stopDispatchChan:    make(chan bool),
-		closeConnectionChan: make(chan *HoneyBadger.Connection),
+		closeConnectionChan: make(chan *HoneyBadger.Connection, 16),
 		pager:               HoneyBadger.NewPager(),
 		pool:                HoneyBadger.NewConnectionPool(),
 	}

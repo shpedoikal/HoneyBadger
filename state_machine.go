@@ -90,6 +90,7 @@ type ConnectionOptions struct {
 type Connection struct {
 	ConnectionOptions
 	attackDetected   bool
+	closeWaitGroup   *sync.WaitGroup
 	stopChan         chan bool
 	receiveChan      chan *PacketManifest
 	packetCount      uint64
@@ -159,15 +160,13 @@ func (c *Connection) updateLastSeen(timestamp time.Time) {
 }
 
 // Close is used by the Connection to shutdown itself.
-// Firstly it removes it's entry from the connection pool...
-// if CloseRequestChanListening is set to true.
-// After that Stop is called.
 func (c *Connection) Close() {
 	log.Printf("Close() - requesting close: %s", c.clientFlow)
+	if c.state == TCP_CLOSED {
+		return
+	}
 	c.state = TCP_CLOSED
-	go func() {
-		c.CloseRequestChan <- c
-	}()
+	c.CloseRequestChan <- c
 }
 
 // Start is used to start the packet receiving goroutine for
@@ -178,12 +177,16 @@ func (c *Connection) Start() {
 }
 
 // Stop frees up all resources used by the connection
-func (c *Connection) Stop() {
+func (c *Connection) Stop(wg *sync.WaitGroup) {
 	log.Printf("Stop() - connection stopped: %s", c.clientFlow)
 	c.ConnectionOptions.Pool.Delete(c.clientFlow)
-	c.stopChan <- true
-	close(c.stopChan)
-	close(c.receiveChan)
+	c.closeWaitGroup = wg
+	go func() {
+		c.stopChan <- true
+	}()
+}
+
+func (c *Connection) Stopped() {
 	if c.getAttackDetectedStatus() == false {
 		c.removeAllLogs()
 	} else {
@@ -192,8 +195,10 @@ func (c *Connection) Stop() {
 	c.ClientCoalesce.Close()
 	c.ServerCoalesce.Close()
 	if c.LogPackets {
-		c.PacketLogger.Stop()
+		c.closeWaitGroup.Add(1)
+		go c.PacketLogger.Stop(c.closeWaitGroup)
 	}
+	c.closeWaitGroup.Done()
 }
 
 // removeAllLogs removes pcap logs associated with this Connection instance
@@ -578,6 +583,7 @@ func (c *Connection) startReceivingPackets() {
 	for {
 		select {
 		case <-c.stopChan:
+			c.Stopped()
 			return
 		case p := <-c.receiveChan:
 			c.receivePacketState(p)

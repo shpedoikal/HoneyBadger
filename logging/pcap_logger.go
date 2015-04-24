@@ -29,6 +29,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
@@ -82,9 +83,10 @@ func (p *PcapLogger) Start() {
 }
 
 // Close causes the file to be closed.
-func (p *PcapLogger) Stop() {
+func (p *PcapLogger) Stop(wg *sync.WaitGroup) {
 	p.stopChan <- true
 	p.fileWriter.Close()
+	wg.Done()
 }
 
 func (p *PcapLogger) logPackets() {

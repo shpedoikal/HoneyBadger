@@ -6,6 +6,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"log"
 	"net"
+	"sync"
 	"testing"
 	"time"
 )
@@ -80,14 +81,17 @@ func TestConnectionPoolCloseAll(t *testing.T) {
 
 	time.Sleep(1000 * time.Millisecond)
 
-	closed := connPool.CloseAllConnections()
+	var wg sync.WaitGroup
+	closed := connPool.CloseAllConnections(&wg)
+	wg.Wait()
 	if closed != 1 || len(connPool.connectionMap) != 0 {
 		t.Errorf("failed to close %d all connections from pool: %d\n", closed, len(connPool.connectionMap))
 		t.Fail()
 	}
 
 	connPool = NewConnectionPool()
-	closed = connPool.CloseAllConnections()
+	closed = connPool.CloseAllConnections(&wg)
+	wg.Wait()
 	if closed != 0 || len(connPool.connectionMap) != 0 {
 		t.Errorf("fail %d\n", closed)
 		t.Fail()
@@ -194,7 +198,8 @@ func TestConnectionPoolCloseAll(t *testing.T) {
 		t.Fail()
 	}
 	log.Print("before CloseAllConnections\n")
-	closed = connPool.CloseAllConnections()
+	closed = connPool.CloseAllConnections(&wg)
+	wg.Wait()
 	log.Print("after CloseAllConnections\n")
 	if connPool.Has(flow) {
 		t.Error("Has method fail")
@@ -216,14 +221,14 @@ func TestConnectionPoolCloseAll(t *testing.T) {
 	conn.state = TCP_DATA_TRANSFER
 
 	connPool.Put(flow, conn)
-	packetManifest = PacketManifest{
+	myPacketManifest := PacketManifest{
 		Timestamp: timestamp2,
 		Flow:      flow,
 		IP:        ip,
 		TCP:       tcp,
 		Payload:   []byte{1, 2, 3, 4, 5, 6, 7},
 	}
-	conn.ReceivePacket(&packetManifest)
+	conn.ReceivePacket(&myPacketManifest)
 	conn2, err = connPool.Get(flow)
 	if conn2 == nil && err != nil {
 		t.Error("Get method fail")

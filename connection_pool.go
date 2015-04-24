@@ -64,44 +64,54 @@ func (c *ConnectionPool) _connections() []*Connection {
 func (c *ConnectionPool) CloseOlderThan(t time.Time) int {
 	c.Lock()
 	defer c.Unlock()
-
+	var wg sync.WaitGroup
 	log.Printf("CloseOlderThan %s", t)
-	closed := 0
-
 	conns := c._connections()
 	if conns == nil {
 		return 0
 	}
+	wg.Add(len(conns))
 	for _, conn := range conns {
 		lastSeen := conn.getLastSeen()
 		if lastSeen.Equal(t) || lastSeen.Before(t) {
-			conn.Stop()
-			c._delete(conn.clientFlow)
-			closed += 1
+			go conn.Stop(&wg)
 		}
 	}
-	return closed
+	wg.Wait()
+	return len(conns)
 }
 
 // CloseAllConnections closes all connections in the pool.
 // Note that honey badger is a passive observer of network events...
 // Closing a Connection means freeing up any resources that a
 // honey badger's Connection struct was using; namely goroutines and memory.
-func (c *ConnectionPool) CloseAllConnections() int {
+func (c *ConnectionPool) CloseAllConnections(testWaitGroup *sync.WaitGroup) int {
 	c.Lock()
 	defer c.Unlock()
+	var wg *sync.WaitGroup
+	if testWaitGroup == nil {
+		wg = &sync.WaitGroup{}
+	} else {
+		wg = testWaitGroup
+		wg.Add(1)
+	}
 
 	conns := c._connections()
 	if conns == nil {
 		return 0
 	}
-	count := 0
+	//wg.Add(len(conns))
 	for _, conn := range conns {
-		conn.Stop()
-		c._delete(conn.clientFlow)
-		count += 1
+		wg.Add(1)
+		go conn.Stop(wg)
 	}
-	return count
+	go func() {
+		wg.Wait()
+		if testWaitGroup != nil {
+			wg.Done()
+		}
+	}()
+	return len(conns)
 }
 
 // Has returns true if the given TcpIpFlow is a key in our
