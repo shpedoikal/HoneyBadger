@@ -165,7 +165,9 @@ func (c *Connection) updateLastSeen(timestamp time.Time) {
 func (c *Connection) Close() {
 	log.Printf("Close() - requesting close: %s", c.clientFlow)
 	c.state = TCP_CLOSED
-	c.CloseRequestChan <- c
+	go func() {
+		c.CloseRequestChan <- c
+	}()
 }
 
 // Start is used to start the packet receiving goroutine for
