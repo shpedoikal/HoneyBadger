@@ -68,7 +68,7 @@ type Inquisitor struct {
 	stopDecodeChan      chan bool
 	dispatchPacketChan  chan HoneyBadger.PacketManifest
 	stopDispatchChan    chan bool
-	closeConnectionChan chan HoneyBadger.CloseRequest
+	closeConnectionChan chan *HoneyBadger.Connection
 	pool                *HoneyBadger.ConnectionPool
 	handle              *pcap.Handle
 	pager               *HoneyBadger.Pager
@@ -83,7 +83,7 @@ func NewInquisitor(options *InquisitorOptions) *Inquisitor {
 		stopDecodeChan:      make(chan bool),
 		dispatchPacketChan:  make(chan HoneyBadger.PacketManifest),
 		stopDispatchChan:    make(chan bool),
-		closeConnectionChan: make(chan HoneyBadger.CloseRequest),
+		closeConnectionChan: make(chan *HoneyBadger.Connection),
 		pager:               HoneyBadger.NewPager(),
 		pool:                HoneyBadger.NewConnectionPool(),
 	}
@@ -228,6 +228,12 @@ func (i *Inquisitor) dispatchPackets() {
 	timeout := i.InquisitorOptions.TcpIdleTimeout
 	ticker := time.Tick(timeout)
 	for {
+		select {
+		case conn := <-i.closeConnectionChan:
+			log.Print("Close request received.")
+			conn.Stop()
+		default:
+		}
 		select {
 		case <-ticker:
 			closed := i.pool.CloseOlderThan(time.Now().Add(timeout * -1))

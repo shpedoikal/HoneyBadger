@@ -69,16 +69,11 @@ type PacketManifest struct {
 	Payload   gopacket.Payload
 }
 
-type CloseRequest struct {
-	Flow           *types.TcpIpFlow
-	CloseReadyChan chan bool
-}
-
 type ConnectionOptions struct {
 	MaxBufferedPagesTotal         int
 	MaxBufferedPagesPerConnection int
 	MaxRingPackets                int
-	CloseRequestChan              chan CloseRequest
+	CloseRequestChan              chan *Connection
 	Pager                         *Pager
 	LogDir                        string
 	LogPackets                    bool
@@ -168,20 +163,9 @@ func (c *Connection) updateLastSeen(timestamp time.Time) {
 // if CloseRequestChanListening is set to true.
 // After that Stop is called.
 func (c *Connection) Close() {
+	log.Printf("Close() - requesting close: %s", c.clientFlow)
 	c.state = TCP_CLOSED
-
-	// remove this connection from the pool so that
-	// further packets will not make it here anymore
-	c.ConnectionOptions.Pool.Delete(c.clientFlow)
-
-	// sloppy ensurance that if the next sniffed packet is destined for this connection
-	// then we'll sleep through it before closing the receiveChan.
-	go func() { // sloppy way to mitigate race with packet sniffer
-		time.Sleep(40 * time.Second)
-		close(c.receiveChan)
-	}()
-
-	c.Stop()
+	c.CloseRequestChan <- c
 }
 
 // Start is used to start the packet receiving goroutine for
@@ -193,7 +177,11 @@ func (c *Connection) Start() {
 
 // Stop frees up all resources used by the connection
 func (c *Connection) Stop() {
-	// XXX must not close channel because data race; close(c.receiveChan)
+	log.Printf("Stop() - connection stopped: %s", c.clientFlow)
+	c.ConnectionOptions.Pool.Delete(c.clientFlow)
+	c.stopChan <- true
+	close(c.stopChan)
+	close(c.receiveChan)
 	if c.getAttackDetectedStatus() == false {
 		c.removeAllLogs()
 	} else {
@@ -585,7 +573,12 @@ func (c *Connection) receivePacketState(p *PacketManifest) {
 }
 
 func (c *Connection) startReceivingPackets() {
-	for p := range c.receiveChan {
-		c.receivePacketState(p)
+	for {
+		select {
+		case <-c.stopChan:
+			return
+		case p := <-c.receiveChan:
+			c.receivePacketState(p)
+		}
 	}
 }
