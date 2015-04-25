@@ -75,7 +75,7 @@ func (c *ConnectionPool) CloseOlderThan(t time.Time) int {
 	for _, conn := range conns {
 		lastSeen := conn.getLastSeen()
 		if lastSeen.Equal(t) || lastSeen.Before(t) {
-			conn.Stop()
+			//XXXconn.Stop()
 			c._delete(conn.clientFlow)
 			closed += 1
 		}
@@ -95,13 +95,14 @@ func (c *ConnectionPool) CloseAllConnections() int {
 	if conns == nil {
 		return 0
 	}
-	count := 0
+	doneChan := make(chan bool)
 	for _, conn := range conns {
-		conn.Stop()
-		c._delete(conn.clientFlow)
-		count += 1
+		go conn.Stop(doneChan)
 	}
-	return count
+	for i := 0; i < len(conns); i++ {
+		<-doneChan
+	}
+	return len(conns)
 }
 
 // Has returns true if the given TcpIpFlow is a key in our

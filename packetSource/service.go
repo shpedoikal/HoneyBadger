@@ -231,7 +231,9 @@ func (i *Inquisitor) dispatchPackets() {
 		select {
 		case conn := <-i.closeConnectionChan:
 			log.Print("Close request received.")
-			conn.Stop()
+			doneChan := make(chan bool)
+			go conn.Stop(doneChan)
+			<-doneChan
 		default:
 		}
 		select {

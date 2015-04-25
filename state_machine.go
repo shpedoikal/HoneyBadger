@@ -178,7 +178,7 @@ func (c *Connection) Start() {
 }
 
 // Stop frees up all resources used by the connection
-func (c *Connection) Stop() {
+func (c *Connection) Stop(doneChan chan bool) {
 	log.Printf("Stop() - connection stopped: %s", c.clientFlow)
 	c.ConnectionOptions.Pool.Delete(c.clientFlow)
 	c.stopChan <- true
@@ -194,6 +194,7 @@ func (c *Connection) Stop() {
 	if c.LogPackets {
 		c.PacketLogger.Stop()
 	}
+	doneChan <- true
 }
 
 // removeAllLogs removes pcap logs associated with this Connection instance
