@@ -98,7 +98,6 @@ func (c *ConnectionPool) CloseAllConnections() int {
 	count := 0
 	for _, conn := range conns {
 		conn.Stop()
-		c._delete(conn.clientFlow)
 		count += 1
 	}
 	return count
