@@ -28,6 +28,7 @@ import (
 	"github.com/google/gopacket/afpacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
+	"github.com/google/gopacket/pfring"
 
 	"github.com/david415/HoneyBadger/types"
 )
@@ -42,6 +43,7 @@ type SnifferOptions struct {
 	Dispatcher   PacketDispatcher
 	Supervisor   types.Supervisor
 	UseAfPacket  bool
+	UsePfRing    bool
 }
 
 // Sniffer sets up the connection pool and is an abstraction layer for dealing
@@ -54,6 +56,7 @@ type Sniffer struct {
 	packetDataSource gopacket.PacketDataSource
 	pcapHandle       *pcap.Handle
 	tpacketHandle    *afpacket.TPacket
+	pfringHandle     *pfring.Ring
 	supervisor       types.Supervisor
 }
 
@@ -89,6 +92,8 @@ func (i *Sniffer) Stop() {
 	i.stopDecodeChan <- true
 	if i.pcapHandle != nil {
 		i.pcapHandle.Close()
+	} else if i.pfringHandle != nil {
+		i.pfringHandle.Close()
 	} else {
 		i.tpacketHandle.Close()
 	}
@@ -97,7 +102,20 @@ func (i *Sniffer) Stop() {
 func (i *Sniffer) setupHandle() {
 	var err error
 
-	if i.options.UseAfPacket { // sniff AF_PACKET interface
+	if i.options.UsePfRing { // sniff PF_RING interface
+		// XXX TODO make it multithreaded and use PF_RING clusters based balanced on flow
+		if i.pfringHandle, err = pfring.NewRing(i.options.Interface, i.options.Snaplen, pfring.FlagPromisc); err != nil {
+			log.Fatal(err)
+		}
+		i.pfringHandle.SetSocketMode(pfring.ReadOnly)
+		if err := ring.Enable(); err != nil {
+			log.Fatal(err)
+		}
+		if err = i.handle.SetBPFFilter(i.options.Filter); err != nil {
+			log.Fatal(err)
+		}
+		i.packetDataSource = i.pfringHandle
+	} else if i.options.UseAfPacket { // sniff AF_PACKET interface
 		if i.tpacketHandle, err = afpacket.NewTPacket(afpacket.OptInterface(i.options.Interface)); err != nil {
 			log.Fatal(err)
 		}

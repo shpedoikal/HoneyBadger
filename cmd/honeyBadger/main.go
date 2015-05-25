@@ -53,6 +53,7 @@ is infinite.`)
 Max packets to buffer total before skipping over gaps in connections and
 continuing to stream connection data.  If zero or less, this is infinite`)
 		useAfPacket = flag.Bool("afpacket", true, "Use AF_PACKET")
+		usePfRing   = flag.Bool("pfring", true, "Use PF_RING")
 	)
 	flag.Parse()
 
@@ -100,6 +101,7 @@ continuing to stream connection data.  If zero or less, this is infinite`)
 		Snaplen:      int32(*snaplen),
 		Filter:       *filter,
 		UseAfPacket:  *useAfPacket,
+		UsePfRing:    *usePfRing,
 	}
 
 	connectionFactory := &HoneyBadger.DefaultConnFactory{}
