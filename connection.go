@@ -204,7 +204,11 @@ func (c *Connection) Close() {
 			c.PacketLogger.Remove()
 		}
 	} else {
-		log.Print("not removing logs. attack detected.\n")
+		log.Print("attack detected; archiving connection's logs\n")
+		if c.LogPackets {
+			c.PacketLogger.Archive()
+		}
+		c.AttackLogger.Archive()
 	}
 	c.ClientCoalesce.Close()
 	c.ServerCoalesce.Close()

@@ -34,8 +34,8 @@ type BadgerSupervisor struct {
 	forceQuitChan    chan os.Signal
 }
 
-func NewBadgerSupervisor(snifferOptions SnifferOptions, dispatcherOptions DispatcherOptions, snifferFactoryFunc func(SnifferOptions) types.PacketSource, connectionFactory ConnectionFactory, packetLoggerFactoryFunc func(string, *types.TcpIpFlow, int, int) types.PacketLogger) *BadgerSupervisor {
-	dispatcher := NewDispatcher(dispatcherOptions, connectionFactory, packetLoggerFactoryFunc)
+func NewBadgerSupervisor(snifferOptions SnifferOptions, dispatcherOptions DispatcherOptions, snifferFactoryFunc func(SnifferOptions) *Sniffer, connectionFactory ConnectionFactory, packetLoggerFactory types.PacketLoggerFactory) *BadgerSupervisor {
+	dispatcher := NewDispatcher(dispatcherOptions, connectionFactory, packetLoggerFactory)
 	snifferOptions.Dispatcher = dispatcher
 	sniffer := snifferFactoryFunc(snifferOptions)
 	supervisor := BadgerSupervisor{
@@ -44,25 +44,25 @@ func NewBadgerSupervisor(snifferOptions SnifferOptions, dispatcherOptions Dispat
 		dispatcher:       dispatcher,
 		sniffer:          sniffer,
 	}
-	sniffer.SetSupervisor(supervisor)
+	sniffer.SetSupervisor(&supervisor)
 	return &supervisor
 }
 
-func (b BadgerSupervisor) GetDispatcher() PacketDispatcher {
+func (b *BadgerSupervisor) GetDispatcher() PacketDispatcher {
 	return b.dispatcher
 }
 
-func (b BadgerSupervisor) GetSniffer() types.PacketSource {
+func (b *BadgerSupervisor) GetSniffer() types.PacketSource {
 	// XXX return types.PacketSource(b.sniffer)
 	return b.sniffer
 }
 
-func (b BadgerSupervisor) Stopped() {
+func (b *BadgerSupervisor) Stopped() {
 	log.Print("BadgerSupervisor.Stopped()")
 	b.childStoppedChan <- true
 }
 
-func (b BadgerSupervisor) Run() {
+func (b *BadgerSupervisor) Run() {
 	log.Println("HoneyBadger: comprehensive TCP injection attack detection.")
 	b.dispatcher.Start()
 	b.sniffer.Start()

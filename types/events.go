@@ -25,6 +25,7 @@ import (
 
 type Logger interface {
 	Log(r *Event)
+	Archive()
 }
 
 type PacketLogger interface {
@@ -32,6 +33,11 @@ type PacketLogger interface {
 	Start()
 	Stop()
 	Remove()
+	Archive()
+}
+
+type PacketLoggerFactory interface {
+	Build(*TcpIpFlow) PacketLogger
 }
 
 type Event struct {

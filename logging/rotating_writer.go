@@ -21,6 +21,7 @@ package logging
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"os"
 )
@@ -66,6 +67,7 @@ func (w *RotatingQuotaWriter) Write(output []byte) (int, error) {
 	if w.fp == nil {
 		w.fp, err = os.Create(w.filename)
 		if err != nil {
+			log.Printf("failed to create pcap log file %s", w.filename)
 			panic(err)
 		}
 		w.mustWriteHeader = true

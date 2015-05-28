@@ -58,7 +58,7 @@ type Sniffer struct {
 }
 
 // NewSniffer creates a new Sniffer struct
-func NewSniffer(options SnifferOptions) types.PacketSource {
+func NewSniffer(options SnifferOptions) *Sniffer {
 	i := Sniffer{
 		options:          options,
 		stopCaptureChan:  make(chan bool),
@@ -175,6 +175,8 @@ func (i *Sniffer) decodePackets() {
 				continue
 			}
 			flow := types.NewTcpIpFlowFromFlows(ip.NetworkFlow(), tcp.TransportFlow())
+			//log.Printf("MEEEEEOW %s", *flow)
+
 			packetManifest := types.PacketManifest{
 				Timestamp: timedRawPacket.Timestamp,
 				Flow:      flow,
