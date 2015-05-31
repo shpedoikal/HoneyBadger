@@ -610,8 +610,8 @@ func (c *Connection) detectCensorInjection(p *types.PacketManifest) {
 				StartSequence: types.Sequence(p.TCP.Seq),
 			}
 			c.AttackLogger.Log(event)
-			return
 		}
+		return
 	}
 	if diff >= 0 {
 		return
@@ -620,9 +620,14 @@ func (c *Connection) detectCensorInjection(p *types.PacketManifest) {
 		attackType += "closed_"
 	} else if c.state == TCP_ANOMALY {
 		attackType += "anomaly_"
-	} else {
-		panic("wtf")
+	} else if c.state == TCP_FIN_WAIT1 {
+		attackType += "Fin-Wait1_"
+	} else if c.state == TCP_FIN_WAIT2 {
+		attackType += "Fin-Wait2_"
+	} else if c.state == TCP_CLOSE_WAIT {
+		attackType += "Close-Wait_"
 	}
+
 	if c.closingFlow != nil {
 		if p.Flow.Equal(c.closingFlow) && types.Sequence(p.TCP.Seq).Difference(c.closingSeq) == 0 {
 			attackType += "closing-sequence-overlap"

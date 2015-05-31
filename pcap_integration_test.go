@@ -50,7 +50,7 @@ func NewTestLogger() TestLogger {
 	return TestLogger{}
 }
 
-func (t *TestLogger) Log(event *types.Event) {
+func (t *TestLogger) Log(event types.Event) {
 	t.count += 1
 }
 
