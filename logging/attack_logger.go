@@ -47,7 +47,7 @@ type AttackJsonLogger struct {
 	writer           io.WriteCloser
 	ArchiveDir       string
 	stopChan         chan bool
-	attackReportChan chan *types.Event
+	attackReportChan chan types.Event
 	logName          string
 }
 
@@ -56,7 +56,7 @@ func NewAttackJsonLogger(archiveDir string) *AttackJsonLogger {
 	a := AttackJsonLogger{
 		ArchiveDir:       archiveDir,
 		stopChan:         make(chan bool),
-		attackReportChan: make(chan *types.Event),
+		attackReportChan: make(chan types.Event),
 	}
 	return &a
 }
@@ -80,11 +80,11 @@ func (a *AttackJsonLogger) receiveReports() {
 	}
 }
 
-func (a *AttackJsonLogger) Log(event *types.Event) {
+func (a *AttackJsonLogger) Log(event types.Event) {
 	a.attackReportChan <- event
 }
 
-func (a *AttackJsonLogger) SerializeAndWrite(event *types.Event) {
+func (a *AttackJsonLogger) SerializeAndWrite(event types.Event) {
 	serialized := &SerializedEvent{
 		Type:         event.Type,
 		Flow:         event.Flow.String(),

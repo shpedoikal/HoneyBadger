@@ -35,7 +35,7 @@ type AttackMetadataJsonLogger struct {
 	logName          string
 	ArchiveDir       string
 	stopChan         chan bool
-	attackReportChan chan *types.Event
+	attackReportChan chan types.Event
 }
 
 // NewAttackMetadataJsonLogger returns a pointer to a AttackMetadataJsonLogger struct
@@ -43,7 +43,7 @@ func NewAttackMetadataJsonLogger(archiveDir string) *AttackMetadataJsonLogger {
 	a := AttackMetadataJsonLogger{
 		ArchiveDir:       archiveDir,
 		stopChan:         make(chan bool),
-		attackReportChan: make(chan *types.Event),
+		attackReportChan: make(chan types.Event),
 	}
 	return &a
 }
@@ -67,11 +67,11 @@ func (a *AttackMetadataJsonLogger) receiveReports() {
 	}
 }
 
-func (a *AttackMetadataJsonLogger) Log(event *types.Event) {
+func (a *AttackMetadataJsonLogger) Log(event types.Event) {
 	a.attackReportChan <- event
 }
 
-func (a *AttackMetadataJsonLogger) SerializeAndWrite(event *types.Event) {
+func (a *AttackMetadataJsonLogger) SerializeAndWrite(event types.Event) {
 	publishableEvent := &SerializedEvent{
 		Type:         event.Type,
 		Flow:         event.Flow.String(),

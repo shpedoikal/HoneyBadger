@@ -24,7 +24,7 @@ import (
 )
 
 type Logger interface {
-	Log(r *Event)
+	Log(r Event)
 }
 
 type PacketLogger interface {
