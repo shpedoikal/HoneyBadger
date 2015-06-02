@@ -602,7 +602,7 @@ func (c *Connection) detectCensorInjection(p *types.PacketManifest) {
 	diff := types.Sequence(p.TCP.Seq).Difference(*nextSeqPtr)
 	if c.state == TCP_DATA_TRANSFER {
 		if diff < 0 && (p.TCP.FIN || p.TCP.RST) {
-			attackType += "data-transfer_"
+			attackType += "data-transfer"
 			event := types.Event{
 				Type:          attackType,
 				Time:          time.Now(),
@@ -620,6 +620,7 @@ func (c *Connection) detectCensorInjection(p *types.PacketManifest) {
 		attackType += "closed_"
 	} else if c.state == TCP_ANOMALY {
 		attackType += "anomaly_"
+		return // XXX just opt out for now...
 	} else if c.state == TCP_FIN_WAIT1 {
 		attackType += "Fin-Wait1_"
 	} else if c.state == TCP_FIN_WAIT2 {
@@ -628,23 +629,32 @@ func (c *Connection) detectCensorInjection(p *types.PacketManifest) {
 		attackType += "Close-Wait_"
 	}
 
+	if p.TCP.FIN || p.TCP.RST {
+		// ignore "closing" retransmissions
+		return
+	}
+
+	if len(p.Payload) == 0 {
+		return
+	}
+
 	if c.closingFlow != nil {
 		if p.Flow.Equal(c.closingFlow) && types.Sequence(p.TCP.Seq).Difference(c.closingSeq) == 0 {
 			attackType += "closing-sequence-overlap"
-			if p.TCP.FIN || p.TCP.RST {
-				// ignore "closing" retransmissions
-				return
-			}
 		} else {
-			attackType += "overlap"
+			return
 		}
+	} else {
+		return
 	}
+
 	event := types.Event{
 		Type:          attackType,
 		Time:          time.Now(),
 		Flow:          p.Flow,
 		StartSequence: types.Sequence(p.TCP.Seq),
 	}
+
 	c.AttackLogger.Log(event)
 	c.attackDetected = true
 }

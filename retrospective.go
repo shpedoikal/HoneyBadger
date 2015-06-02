@@ -181,11 +181,13 @@ func getOverlapBytes(head, tail *types.Ring, start, end types.Sequence) ([]byte,
 			}
 		} else {
 			if diff > packetLength {
+				// XXX should we opt out instead of making the comparison?
 				overlapEndSlice = packetLength
 			} else {
 				overlapEndSlice = packetLength - diff
 				if overlapEndSlice < overlapStartSlice {
-					panic("wtf")
+					// XXX wtf
+					return nil, 0, 0
 				}
 			}
 			tailSlice = len(tail.Reassembly.Bytes)
