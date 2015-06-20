@@ -28,10 +28,23 @@ import (
 	"github.com/google/gopacket/layers"
 
 	"github.com/david415/HoneyBadger/afpacket_sniffer"
-	"github.com/david415/HoneyBadger/bpf_sniffer"
+	"github.com/david415/HoneyBadger/bsdbpf"
 	"github.com/david415/HoneyBadger/pcap_sniffer"
 	"github.com/david415/HoneyBadger/types"
 )
+
+// PacketDataSource is an interface for some source of packet data.
+type PacketDataSourceCloser interface {
+	// ReadPacketData returns the next packet available from this data source.
+	// It returns:
+	// data: The bytes of an individual packet.
+	// ci: Metadata about the capture
+	// err: An error encountered while reading packet data. If err != nil,
+	// then data/ci will be ignored.
+	ReadPacketData() (data []byte, ci gopacket.CaptureInfo, err error)
+	// Close closes the packet data source.
+	Close()
+}
 
 // SnifferOptions are user set parameters for specifying how to
 // receive packets.
@@ -55,10 +68,7 @@ type Sniffer struct {
 	decodePacketChan chan TimedRawPacket
 	stopDecodeChan   chan bool
 	supervisor       types.Supervisor
-	packetDataSource gopacket.PacketDataSource
-	pcapHandle       *pcap_sniffer.PcapHandle
-	afpacketHandle   *afpacket_sniffer.AfpacketHandle
-	bpfHandle        *bpf_sniffer.BpfSniffer
+	packetDataSource PacketDataSourceCloser
 }
 
 // NewSniffer creates a new Sniffer struct
@@ -81,7 +91,7 @@ func (i *Sniffer) GetStartedChan() chan bool {
 
 // Start... starts the TCP attack inquisition!
 func (i *Sniffer) Start() {
-	if i.pcapHandle == nil && i.afpacketHandle == nil {
+	if i.packetDataSource == nil {
 		i.setupHandle()
 	}
 	go i.capturePackets()
@@ -91,31 +101,36 @@ func (i *Sniffer) Start() {
 func (i *Sniffer) Stop() {
 	i.stopCaptureChan <- true
 	i.stopDecodeChan <- true
-	if i.pcapHandle != nil {
-		i.pcapHandle.Close()
-	} else {
-		i.afpacketHandle.Close()
+	if i.packetDataSource != nil {
+		i.packetDataSource.Close()
 	}
 }
 
 func (i *Sniffer) setupHandle() {
 	var err error
 	if i.options.UseBpf { // sniff BSD BPF
-		i.bpfHandle = bpf_sniffer.NewBpfSniffer()
-		err = i.bpfHandle.Init(i.options.Interface)
-		i.packetDataSource = i.bpfHandle
+		newBPFSniffer := bsdbpf.GetSniffer()
+		bpfHandle, err := newBPFSniffer(i.options.Interface, nil)
+		i.packetDataSource = bpfHandle
+		if err != nil {
+			log.Fatal(err)
+		}
+		return
 	} else if i.options.UseAfPacket { // sniff AF_PACKET
 		log.Printf("Starting AF_PACKET capture on interface %s", i.options.Interface)
-		i.afpacketHandle, err = afpacket_sniffer.NewAfpacketHandle(i.options.Interface)
-		i.packetDataSource = i.afpacketHandle
+		var afpacketHandle *afpacket_sniffer.AfpacketHandle
+		afpacketHandle, err = afpacket_sniffer.NewAfpacketHandle(i.options.Interface)
+		i.packetDataSource = afpacketHandle
 	} else if i.options.Filename != "" { // sniff pcap file
 		log.Printf("Reading from pcap file %q", i.options.Filename)
-		i.pcapHandle, err = pcap_sniffer.NewPcapFileSniffer(i.options.Filename)
-		i.packetDataSource = i.pcapHandle
+		var pcapHandle *pcap_sniffer.PcapHandle
+		pcapHandle, err = pcap_sniffer.NewPcapFileSniffer(i.options.Filename)
+		i.packetDataSource = pcapHandle
 	} else { // sniff pcap wire interface
 		log.Printf("Starting pcap capture on interface %q", i.options.Interface)
-		i.pcapHandle, err = pcap_sniffer.NewPcapWireSniffer(i.options.Interface, i.options.Snaplen, i.options.WireDuration, i.options.Filter)
-		i.packetDataSource = i.pcapHandle
+		var pcapHandle *pcap_sniffer.PcapHandle
+		pcapHandle, err = pcap_sniffer.NewPcapWireSniffer(i.options.Interface, i.options.Snaplen, i.options.WireDuration, i.options.Filter)
+		i.packetDataSource = pcapHandle
 	}
 	if err != nil {
 		log.Fatal(err)

@@ -19,23 +19,4 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package bpf_sniffer
-
-import (
-	"github.com/google/gopacket"
-)
-
-type BpfSniffer struct {
-}
-
-func NewBpfSniffer() *BpfSniffer {
-	return &BpfSniffer{}
-}
-
-func (b *BpfSniffer) Init(fufu string) error {
-	return nil
-}
-
-func (b *BpfSniffer) ReadPacketData() (data []byte, ci gopacket.CaptureInfo, err error) {
-	panic("BPF not supported in Linux")
-}
+package bsdbpf
